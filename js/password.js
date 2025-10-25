@@ -138,7 +138,7 @@ function showPasswordModal() {
             const title = passwordModal.querySelector('h2');
             const description = passwordModal.querySelector('p');
             if (title) title.textContent = '访问验证';
-            if (description) description.textContent = '请输入密码继续访问';
+            if (description) description.textContent = '本站仅用于个人代码学习使用非商用，感兴趣的同学可关注公众号“小牛搜索”一起讨论学习。';
             
             const form = passwordModal.querySelector('form');
             if (form) form.style.display = 'block';
