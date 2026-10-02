@@ -45,9 +45,14 @@ async function loadCustomerSites() {
 
         const res = await fetch(url);
         if (!res.ok) {
-            console.error('[API列表] 加载失败，状态码:', res.status);
+            // 打印服务端返回的具体错误信息，方便排查
+            let errBody = '';
+            try { errBody = await res.text(); } catch (e) { /* ignore */ }
+            console.error('[API列表] 加载失败，状态码:', res.status, '返回内容:', errBody);
             if (res.status === 401) {
                 console.error('[API列表] 鉴权失败，请检查密钥是否正确');
+            } else if (res.status === 500) {
+                console.error('[API列表] 服务端错误，请检查 CF Pages 环境变量 PASSWORD 和 KV 绑定 API_CONFIG 是否已配置');
             }
             return;
         }
