@@ -1,106 +1,68 @@
-const CUSTOMER_SITES = {
-    dyttzy: {
-        api: 'http://caiji.dyttzyapi.com/api.php/provide/vod',
-        name: '电影天堂资源',
-        detail: 'http://caiji.dyttzyapi.com', 
-    },
-    ruyi: {
-        api: 'https://cj.rycjapi.com/api.php/provide/vod',
-        name: '如意资源',
-    },
-    bfzy: {
-        api: 'https://bfzyapi.com/api.php/provide/vod',
-        name: '暴风资源',
-    },
-    tyyszy: {
-        api: 'https://tyyszy.com/api.php/provide/vod',
-        name: '天涯资源',
-    },
-    xiaomaomi: {
-        api: 'https://zy.xmm.hk/api.php/provide/vod',
-        name: '小猫咪资源',
-    },
-    ffzy: {
-        api: 'http://ffzy5.tv/api.php/provide/vod',
-        name: '非凡影视',
-        detail: 'http://ffzy5.tv', 
-    },
-    heimuer: {
-        api: 'https://json.heimuer.xyz/api.php/provide/vod',
-        name: '黑木耳',
-        detail: 'https://heimuer.tv', 
-    },
-    zy360: {
-        api: 'https://360zy.com/api.php/provide/vod',
-        name: '360资源',
-    },
-    iqiyi: {
-        api: 'https://www.iqiyizyapi.com/api.php/provide/vod',
-        name: 'iqiyi资源',
-    },
-    wolong: {
-        api: 'https://wolongzyw.com/api.php/provide/vod',
-        name: '卧龙资源',
-    }, 
-    hwba: {
-        api: 'https://cjhwba.com/api.php/provide/vod',
-        name: '华为吧资源',
-    },
-    jisu: {
-        api: 'https://jszyapi.com/api.php/provide/vod',
-        name: '极速资源',
-        detail: 'https://jszyapi.com', 
-    },
-    dbzy: {
-        api: 'https://dbzy.tv/api.php/provide/vod',
-        name: '豆瓣资源',
-    },
-    mozhua: {
-        api: 'https://mozhuazy.com/api.php/provide/vod',
-        name: '魔爪资源',
-    },
-    mdzy: {
-        api: 'https://www.mdzyapi.com/api.php/provide/vod',
-        name: '魔都资源',
-    },
-    zuid: {
-        api: 'https://api.zuidapi.com/api.php/provide/vod',
-        name: '最大资源'
-    },
-    yinghua: {
-        api: 'https://m3u8.apiyhzy.com/api.php/provide/vod',
-        name: '樱花资源'
-    },
-    baidu: {
-        api: 'https://api.apibdzy.com/api.php/provide/vod',
-        name: '百度云资源'
-    },
-    wujin: {
-        api: 'https://api.wujinapi.me/api.php/provide/vod',
-        name: '无尽资源'
-    },
-    wwzy: {
-        api: 'https://wwzy.tv/api.php/provide/vod',
-        name: '旺旺短剧'
-    },
-    ikun: {
-        api: 'https://ikunzyapi.com/api.php/provide/vod',
-        name: 'iKun资源'
-    },
-    lzi: {
-        api: 'https://cj.lziapi.com/api.php/provide/vod/',
-        name: '量子资源站'
-    },
-    testSource: {
-        api: 'https://www.example.com/api.php/provide/vod',
-        name: '空内容测试源',
-        adult: true
-    },
-};
+// API站点列表 - 异步从 KV 加载（密钥验证后才能拉取）
+// 原 API 明文已迁移至 CF KV，前端不再硬编码，防止爬虫直接抓取 js 文件
 
-// 调用全局方法合并
-if (window.extendAPISites) {
-    window.extendAPISites(CUSTOMER_SITES);
-} else {
-    console.error("错误：请先加载 config.js！");
+/**
+ * 从服务端（Pages Function + KV）加载 API 站点列表
+ * 请求需携带密码哈希鉴权，未验证密钥则返回 401
+ */
+async function loadCustomerSites() {
+    try {
+        // 获取密码哈希（与 password.js 存储格式一致）
+        let hash = null;
+
+        // 1. 优先从 password.js 验证后存储的 localStorage 中读取
+        const stored = localStorage.getItem('passwordVerified');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                hash = parsed.passwordHash;
+            } catch (e) { /* ignore */ }
+        }
+
+        // 2. 降级：读取 proxyAuthHash（proxy-auth.js 缓存的哈希）
+        if (!hash) {
+            hash = localStorage.getItem('proxyAuthHash');
+        }
+
+        // 3. 降级：读取环境变量注入的 PASSWORD 哈希
+        if (!hash && window.__ENV__ && window.__ENV__.PASSWORD) {
+            hash = window.__ENV__.PASSWORD;
+        }
+
+        // 4. 降级：调用 proxy-auth.js 的 getPasswordHash
+        if (!hash && window.ProxyAuth && window.ProxyAuth.getPasswordHash) {
+            hash = await window.ProxyAuth.getPasswordHash();
+        }
+
+        if (!hash) {
+            console.warn('[API列表] 未获取到密码哈希，跳过加载');
+            return;
+        }
+
+        // 时间戳防重放（10分钟有效，与服务端一致）
+        const timestamp = Date.now();
+        const url = `/api-sites?auth=${encodeURIComponent(hash)}&t=${timestamp}`;
+
+        const res = await fetch(url);
+        if (!res.ok) {
+            console.error('[API列表] 加载失败，状态码:', res.status);
+            if (res.status === 401) {
+                console.error('[API列表] 鉴权失败，请检查密钥是否正确');
+            }
+            return;
+        }
+
+        const sites = await res.json();
+        if (sites && window.extendAPISites) {
+            window.extendAPISites(sites);
+            // 派发加载完成事件，供其他模块监听
+            document.dispatchEvent(new CustomEvent('apiSitesLoaded'));
+            console.log('[API列表] 已从 KV 加载', Object.keys(sites).length, '个站点');
+        }
+    } catch (error) {
+        console.error('[API列表] 加载异常:', error);
+    }
 }
+
+// 暴露到全局
+window.loadCustomerSites = loadCustomerSites;
