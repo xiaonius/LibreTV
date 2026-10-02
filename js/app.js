@@ -25,6 +25,12 @@ document.addEventListener('DOMContentLoaded', function () {
     // 渲染搜索历史
     renderSearchHistory();
 
+    // 监听 API 站点加载完成事件（从 KV 异步加载后触发）
+    document.addEventListener('apiSitesLoaded', function () {
+        initAPICheckboxes();
+        updateSelectedApiCount();
+    });
+
     // 设置默认API选择（如果是第一次加载）
     if (!localStorage.getItem('hasInitializedDefaults')) {
         // 默认选中资源
