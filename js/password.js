@@ -213,6 +213,11 @@ async function handlePasswordSubmit() {
 
         // 触发密码验证成功事件
         document.dispatchEvent(new CustomEvent('passwordVerified'));
+
+        // 密码验证成功后，异步从 KV 加载 API 站点列表
+        if (window.loadCustomerSites) {
+            await window.loadCustomerSites();
+        }
     } else {
         showPasswordError();
         if (passwordInput) {
@@ -236,6 +241,11 @@ function initPasswordProtection() {
     if (isPasswordProtected() && !isPasswordVerified()) {
         showPasswordModal();
         return;
+    }
+
+    // 用户已验证（免密进入），异步从 KV 加载 API 站点列表
+    if (isPasswordVerified() && window.loadCustomerSites) {
+        window.loadCustomerSites();
     }
 }
 
